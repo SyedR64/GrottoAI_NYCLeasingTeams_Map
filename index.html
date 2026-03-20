@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grotto AI — NYC Metro Multifamily Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+body { display: flex; height: 100vh; overflow: hidden; background: #0a1220; }
+#sidebar { width: 360px; min-width: 360px; background: #0f1b2e; color: #fff; display: flex; flex-direction: column; overflow: hidden; z-index: 1000; border-right: 1px solid #1a3050; }
+#hdr { padding: 12px 14px 8px; background: #0a1220; border-bottom: 2px solid #1e7c5a; }
+#hdr h1 { font-size: 13px; font-weight: 700; color: #fff; }
+#hdr p { font-size: 10px; color: #557799; margin-top: 2px; }
+#ctrl { padding: 8px 12px; background: #0d1828; border-bottom: 1px solid #1a3050; }
+.fl { font-size: 9px; color: #446688; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; margin-top: 5px; }
+.fr { display: flex; flex-wrap: wrap; gap: 3px; }
+.fb { padding: 2px 8px; font-size: 10px; border-radius: 9px; border: none; cursor: pointer; font-weight: 600; background: #1a2f4a; color: #668899; transition: all 0.12s; }
+.fb.active { background: #1e7c5a; color: #fff; }
+#si { width: 100%; padding: 5px 9px; border-radius: 5px; border: 1px solid #1a3a5c; background: #0a1220; color: #fff; font-size: 11px; outline: none; margin-top: 6px; }
+#si::placeholder { color: #2a4055; }
+#stats { padding: 6px 12px; background: #0b1525; border-bottom: 1px solid #1a3050; }
+.sg { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; margin-top: 4px; }
+.sb { background: #0e1828; border-radius: 4px; padding: 4px 5px; text-align: center; }
+.sv { font-size: 12px; font-weight: 700; color: #3dd68c; }
+.sl { font-size: 8px; color: #334455; margin-top: 1px; }
+.vc { font-size: 9px; color: #446688; }
+#list { flex: 1; overflow-y: auto; }
+#list::-webkit-scrollbar { width: 3px; }
+#list::-webkit-scrollbar-thumb { background: #1a3a5c; }
+.pc { padding: 7px 12px; border-bottom: 1px solid #0e1c2a; cursor: pointer; transition: background 0.1s; }
+.pc:hover { background: #0d1e30; }
+.pc.active { background: #091a12; border-left: 3px solid #1e7c5a; padding-left: 9px; }
+.pn { font-size: 11px; font-weight: 700; margin-bottom: 1px; }
+.ps { font-size: 9px; color: #3a5570; margin-bottom: 3px; }
+.tr { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 3px; }
+.tg { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
+.to { background: #1a3050; color: #6688bb; }
+.tu { background: #0f2a18; color: #3dd68c; }
+.tr2 { background: #2a1e08; color: #cc8a20; }
+.tn { background: #251535; color: #bb77ee; }
+.ci { font-size: 9px; color: #4a6a88; line-height: 1.65; }
+.ci a { color: #3dd68c; text-decoration: none; }
+.clbl { color: #3dd68c; font-weight: 700; font-size: 8px; }
+.nt { font-size: 8px; color: #2a3d50; margin-top: 2px; font-style: italic; }
+#map { flex: 1; }
+.leaflet-popup-content-wrapper { background: #0f1b2e; border: 1px solid #1e7c5a; border-radius: 7px; color: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.7); }
+.leaflet-popup-tip { background: #0f1b2e; }
+.pt { font-size: 12px; font-weight: 700; color: #3dd68c; margin-bottom: 2px; }
+.pm { font-size: 10px; color: #557799; margin-bottom: 4px; }
+.pr { font-size: 10px; color: #ccdde6; margin: 2px 0; }
+.pc2 { margin-top: 5px; font-size: 9px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <div id="hdr">
+    <h1>Grotto AI — NYC Metro Multifamily</h1>
+    <p>100+ unit rental buildings · NYC + NJ + Westchester</p>
+  </div>
+  <div id="ctrl">
+    <div class="fl">Region</div>
+    <div class="fr" id="rf">
+      <button class="fb active" data-f="region" data-v="all">All</button>
+      <button class="fb" data-f="region" data-v="Manhattan">Manhattan</button>
+      <button class="fb" data-f="region" data-v="Brooklyn">Brooklyn</button>
+      <button class="fb" data-f="region" data-v="Queens">Queens</button>
+      <button class="fb" data-f="region" data-v="Bronx">Bronx</button>
+      <button class="fb" data-f="region" data-v="NJ">NJ</button>
+      <button class="fb" data-f="region" data-v="Westchester">Westchester</button>
+    </div>
+    <div class="fl">Status</div>
+    <div class="fr" id="sf">
+      <button class="fb active" data-f="status" data-v="all">All</button>
+      <button class="fb" data-f="status" data-v="Leasing">Active</button>
+      <button class="fb" data-f="status" data-v="Lease-Up">Lease-Up</button>
+      <button class="fb" data-f="status" data-v="Coming Soon">Coming Soon</button>
+    </div>
+    <input type="text" id="si" placeholder="Search building, neighborhood, operator..." oninput="fAll()"/>
+  </div>
+  <div id="stats">
+    <div class="vc" id="vc">Loading…</div>
+    <div class="sg">
+      <div class="sb"><div class="sv" id="sp">—</div><div class="sl">Props</div></div>
+      <div class="sb"><div class="sv" id="su">—</div><div class="sl">Units</div></div>
+      <div class="sb"><div class="sv" id="sr">—</div><div class="sl">Regions</div></div>
+      <div class="sb"><div class="sv" id="so">—</div><div class="sl">Operators</div></div>
+    </div>
+  </div>
+  <div id="list"></div>
+</div>
+<div id="map"></div>
+
+<script>
+const RC = { Manhattan:"#4a9eff", Brooklyn:"#3dd68c", Queens:"#f0a030", Bronx:"#cc88ff", NJ:"#ff6b6b", Westchester:"#00d4cc" };
+const SI = { "Leasing":"✅", "Lease-Up":"🔄", "Coming Soon":"🔜" };
+
+const P = [
+  // ══ MANHATTAN — MEGA/ICONIC ══
+  {id:1,n:"Stuyvesant Town / Peter Cooper Village",a:"14th–23rd St & 1st Ave–Ave C",op:"Blackstone / Ivanhoé Cambridge",h:"East Village/Gramercy",r:"Manhattan",u:11250,rn:"$3,200–$7,500",s:"Leasing",y:1947,lat:40.7310,lng:-73.9778,c:[{ro:"Leasing",nm:"StuyTown Leasing",ph:"212-420-5000",em:"leasing@stuytown.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"11,250-unit iconic complex. 80 acres. Blackstone/Ivanhoé Cambridge. NYC's largest private rental."},
+  {id:2,n:"Waterline Square",a:"675 W 59th St",op:"GID / Windsor",h:"Upper West Side",r:"Manhattan",u:643,rn:"$6,000–$35,000",s:"Leasing",y:2020,lat:40.7734,lng:-73.9933,c:[{ro:"Leasing",nm:"Windsor Communities",ph:"212-265-0100",em:"waterline@windsorcommunities.com"}],ho:"Mon–Sun 10am–6pm",nt:"643 rental units in 3 towers. 100,000 sf Waterline Club. $2.3B development."},
+  {id:3,n:"The Aldyn",a:"60 Riverside Blvd",op:"Related",h:"Lincoln Square",r:"Manhattan",u:310,rn:"$5,500–$20,000",s:"Leasing",y:2010,lat:40.7748,lng:-73.9904,c:[{ro:"Leasing",nm:"Related Leasing",ph:"212-787-7200",em:"aldyn@related.com"}],ho:"Mon–Sun 10am–6pm",nt:"310-unit UWS luxury. 40K sf amenities. One Riverside Park adjacent."},
+  {id:4,n:"The Max",a:"606 W 57th St",op:"TF Cornerstone",h:"Hell's Kitchen",r:"Manhattan",u:1028,rn:"$3,800–$9,500",s:"Leasing",y:2014,lat:40.7698,lng:-73.9918,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"212-757-8900",em:"themax@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"1,028-unit TFC flagship."},
+  {id:5,n:"505 West 37th",a:"505 W 37th St",op:"TF Cornerstone",h:"Hudson Yards",r:"Manhattan",u:835,rn:"$3,600–$8,200",s:"Leasing",y:2016,lat:40.7560,lng:-74.0005,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"212-290-7805",em:"505w37@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"835 units. Hudson Yards corridor."},
+  {id:6,n:"The Sheffield",a:"322 W 57th St",op:"Glenwood",h:"Midtown West",r:"Manhattan",u:845,rn:"$3,900–$11,000",s:"Leasing",y:2005,lat:40.7670,lng:-73.9846,c:[{ro:"Leasing",nm:"Glenwood Leasing",ph:"212-247-3131",em:"sheffield@glenwood.nyc"}],ho:"Mon–Fri 9–6, Sat 10–5",nt:"845-unit Glenwood flagship."},
+  {id:7,n:"The Milan",a:"300 E 55th St",op:"Glenwood",h:"Midtown East",r:"Manhattan",u:516,rn:"$3,800–$10,000",s:"Leasing",y:2003,lat:40.7558,lng:-73.9664,c:[{ro:"Leasing",nm:"Glenwood Leasing",ph:"212-752-8600",em:"milan@glenwood.nyc"}],ho:"Mon–Fri 9–6, Sat 10–5",nt:"516-unit prime Midtown East."},
+  {id:8,n:"One Manhattan Square",a:"252 South St",op:"Extell",h:"Lower East Side",r:"Manhattan",u:815,rn:"$3,800–$12,000",s:"Leasing",y:2019,lat:40.7108,lng:-73.9844,c:[{ro:"Leasing",nm:"Extell Leasing",ph:"212-945-5050",em:"onemanhattansq@extell.com"}],ho:"Mon–Sun 10am–7pm",nt:"815 units. 100+ amenities. Extell rental flagship."},
+  {id:9,n:"2 Gold Street",a:"2 Gold St",op:"TF Cornerstone",h:"Financial District",r:"Manhattan",u:650,rn:"$3,200–$7,800",s:"Leasing",y:2006,lat:40.7062,lng:-74.0085,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"212-514-9200",em:"2gold@tfc.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"650-unit FiDi tower."},
+  {id:10,n:"45 Wall Street",a:"45 Wall St",op:"TF Cornerstone",h:"Financial District",r:"Manhattan",u:435,rn:"$3,100–$7,200",s:"Leasing",y:2005,lat:40.7074,lng:-74.0114,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"212-968-1520",em:"45wall@tfc.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"435 units. Historic conversion on Wall St."},
+  {id:11,n:"455 West 37th",a:"455 W 37th St",op:"TF Cornerstone",h:"Hudson Yards",r:"Manhattan",u:394,rn:"$3,500–$7,500",s:"Leasing",y:2017,lat:40.7558,lng:-74.0015,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"212-290-7810",em:"455w37@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"394 units."},
+  {id:12,n:"The Ventura",a:"130 E 40th St",op:"Glenwood",h:"Murray Hill",r:"Manhattan",u:502,rn:"$3,600–$9,000",s:"Leasing",y:2001,lat:40.7517,lng:-73.9791,c:[{ro:"Leasing",nm:"Glenwood Leasing",ph:"212-683-7474",em:"ventura@glenwood.nyc"}],ho:"Mon–Fri 9–6, Sat 10–5",nt:"502-unit Glenwood Murray Hill."},
+  {id:13,n:"Abington House",a:"500 W 30th St",op:"Related",h:"Hudson Yards",r:"Manhattan",u:366,rn:"$4,200–$12,000",s:"Leasing",y:2013,lat:40.7542,lng:-74.0005,c:[{ro:"Leasing",nm:"Related Residential",ph:"212-268-5900",em:"abington@related.com"}],ho:"Mon–Sun 10am–6pm",nt:"366-unit Related Hudson Yards."},
+  {id:14,n:"Forty Six Fifty (Inwood)",a:"4650 Broadway",op:"Rose Associates",h:"Inwood",r:"Manhattan",u:250,rn:"$2,600–$5,200",s:"Lease-Up",y:2024,lat:40.8673,lng:-73.9215,c:[{ro:"Leasing",nm:"Rose Associates",ph:"212-304-9400",em:"4650broadway@rosenyc.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"250-unit new construction. Rose Associates managed. Inwood."},
+  {id:15,n:"Avalon Midtown West",a:"310 W 52nd St",op:"AvalonBay",h:"Midtown West",r:"Manhattan",u:323,rn:"$3,800–$9,200",s:"Leasing",y:2014,lat:40.7626,lng:-73.9863,c:[{ro:"Leasing",nm:"AvalonBay Leasing",ph:"212-245-3200",em:"avalonmidtown@avalonbay.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"323-unit AvalonBay. 90,000+ units nationally."},
+  {id:16,n:"View 34",a:"401 E 34th St",op:"Milstein Properties",h:"Murray Hill / Kips Bay",r:"Manhattan",u:836,rn:"$3,500–$8,000",s:"Leasing",y:2012,lat:40.7440,lng:-73.9713,c:[{ro:"Leasing",nm:"Milstein Leasing",ph:"212-213-3400",em:"view34@milstein.com"}],ho:"Mon–Sun 10am–6pm",nt:"836-unit tower occupies full block 34th–35th & 1st Ave. Stunning East River views."},
+  {id:17,n:"West Side Marquis",a:"490 W 95th St",op:"Equity Residential",h:"Upper West Side",r:"Manhattan",u:246,rn:"$4,000–$9,500",s:"Leasing",y:2015,lat:40.7926,lng:-73.9762,c:[{ro:"Leasing",nm:"EQR Leasing",ph:"212-866-5100",em:"wsmarquis@equityresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"246-unit UWS. Equity Residential national REIT."},
+  {id:18,n:"The Harrison (UWS)",a:"205 W 76th St",op:"Equity Residential",h:"Upper West Side",r:"Manhattan",u:219,rn:"$4,200–$11,000",s:"Leasing",y:2008,lat:40.7803,lng:-73.9812,c:[{ro:"Leasing",nm:"EQR Leasing",ph:"212-799-1000",em:"harrison@equityresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"219-unit UWS. EQR Robert A.M. Stern design."},
+
+  // ══ BROOKLYN ══
+  {id:19,n:"One Domino Square (Rental Tower)",a:"5 South 5th St",op:"Two Trees",h:"Williamsburg",r:"Brooklyn",u:399,rn:"$6,200–$15,000",s:"Leasing",y:2024,lat:40.7121,lng:-73.9662,c:[{ro:"Leasing",nm:"Two Trees Leasing",ph:"646-212-2352",em:"leasing@onedominosquare.com"}],ho:"Mon–Sun 10am–6pm",nt:"399-unit Selldorf-designed rental. Leased up in under 1 year. 45,000 sf amenity club."},
+  {id:20,n:"Denizen BSHWK",a:"54 Noll St / 123 Melrose St",op:"All Year Management",h:"Bushwick",r:"Brooklyn",u:911,rn:"$2,200–$3,800",s:"Leasing",y:2018,lat:40.7055,lng:-73.9267,c:[{ro:"Leasing",nm:"MySpace NYC",ph:"718-550-2079",em:"hello@denizenbushwick.com"}],ho:"Mon–Sun 10am–7pm",nt:"911 units across 2 city blocks. Former Rheingold Brewery site. 100K sf amenities."},
+  {id:21,n:"The Rheingold",a:"10 Montieth St",op:"All Year Management",h:"Bushwick",r:"Brooklyn",u:500,rn:"$2,300–$4,200",s:"Leasing",y:2018,lat:40.7042,lng:-73.9282,c:[{ro:"Leasing",nm:"Rheingold Leasing",ph:"718-387-7200",em:"leasing@therheingold.com"}],ho:"Mon–Sun 10am–6pm",nt:"500+ units. Rheingold Brewery redevelopment. 24-hr doorman."},
+  {id:22,n:"595 Dean St (Pacific Park)",a:"595 Dean St",op:"TF Cornerstone",h:"Prospect Heights",r:"Brooklyn",u:798,rn:"$3,000–$7,000",s:"Leasing",y:2023,lat:40.6830,lng:-73.9747,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"718-855-1000",em:"595dean@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"798 units. Chelsea Piers Field House on-site. Pacific Park master plan."},
+  {id:23,n:"18 Sixth Ave (Pacific Park)",a:"18 Sixth Ave",op:"Greenland Forest City",h:"Prospect Heights",r:"Brooklyn",u:859,rn:"$2,800–$6,500",s:"Leasing",y:2023,lat:40.6836,lng:-73.9761,c:[{ro:"Leasing",nm:"Pacific Park Leasing",ph:"718-398-4400",em:"18sixthave@pacificparkbk.com"}],ho:"Mon–Sun 10am–6pm",nt:"859-unit Pacific Park. 258 affordable. Tallest building in master plan."},
+  {id:24,n:"The Brook (589 Fulton)",a:"589 Fulton St",op:"Rabsky Group",h:"Downtown Brooklyn",r:"Brooklyn",u:600,rn:"$2,900–$6,800",s:"Lease-Up",y:2025,lat:40.6889,lng:-73.9793,c:[{ro:"Leasing",nm:"Leasing Office",ph:"718-237-0600",em:"leasing@thebrookbk.com"}],ho:"Mon–Sun 10am–7pm",nt:"52-story. One of tallest buildings in Brooklyn. 2025 delivery."},
+  {id:25,n:"The Maxwell (111 Willoughby)",a:"111 Willoughby St",op:"Steiner NYC",h:"Downtown Brooklyn",r:"Brooklyn",u:420,rn:"$2,950–$5,500",s:"Leasing",y:2024,lat:40.6923,lng:-73.9849,c:[{ro:"Leasing",nm:"Steiner Leasing",ph:"718-855-9500",em:"maxwell@steinernyc.com"}],ho:"Mon–Sun 10am–6pm",nt:"40-story. Landscaped roof deck, top-floor lounge."},
+  {id:26,n:"499 President St (Gowanus)",a:"499 President St",op:"Brodsky / Avery Hall",h:"Gowanus",r:"Brooklyn",u:350,rn:"$2,800–$6,500",s:"Leasing",y:2025,lat:40.6763,lng:-73.9877,c:[{ro:"Leasing",nm:"Leasing Office",ph:"718-622-4990",em:"leasing@499president.com"}],ho:"Mon–Sun 10am–6pm",nt:"350-unit Gowanus 2025 delivery. Rooftop pool, golf simulator."},
+  {id:27,n:"Hanover House",a:"15 Hanover Pl",op:"RXR / Simon Baron",h:"Downtown Brooklyn",r:"Brooklyn",u:314,rn:"$3,317–$5,500",s:"Leasing",y:2025,lat:40.6903,lng:-73.9839,c:[{ro:"Leasing",nm:"RXR Leasing",ph:"718-246-0900",em:"hanoverhouse@rxr.com"}],ho:"Mon–Sun 10am–6pm",nt:"34-story mixed-use. 314 units. 2025."},
+  {id:28,n:"One Blue Slip",a:"58 Beard St",op:"Brookfield",h:"Red Hook",r:"Brooklyn",u:450,rn:"$3,200–$8,500",s:"Leasing",y:2018,lat:40.6785,lng:-74.0084,c:[{ro:"Leasing",nm:"Brookfield Leasing",ph:"718-210-9200",em:"oneblueslip@brookfieldproperties.com"}],ho:"Mon–Sun 10am–6pm",nt:"Luxury waterfront Red Hook."},
+  {id:29,n:"Williamsburg Wharf Ph 1",a:"480 Kent Ave",op:"Naftali Group",h:"Williamsburg",r:"Brooklyn",u:420,rn:"$3,500–$10,000",s:"Lease-Up",y:2024,lat:40.7127,lng:-73.9597,c:[{ro:"Leasing",nm:"Naftali Leasing",ph:"718-388-9900",em:"wburg@naftaligroup.com"}],ho:"Mon–Sun 10am–6pm",nt:"East River waterfront Williamsburg. Naftali Group development."},
+  {id:30,n:"One John Street (DUMBO)",a:"1 John St",op:"Two Trees",h:"DUMBO",r:"Brooklyn",u:323,rn:"$3,500–$9,000",s:"Leasing",y:2017,lat:40.7033,lng:-73.9892,c:[{ro:"Leasing",nm:"Two Trees Leasing",ph:"718-254-1400",em:"onejohn@twotreesny.com"}],ho:"Mon–Sun 10am–6pm",nt:"Two Trees DUMBO flagship."},
+  {id:31,n:"Quay Tower",a:"50 Bridge Park Dr",op:"Two Trees",h:"Brooklyn Heights",r:"Brooklyn",u:126,rn:"$4,200–$14,000",s:"Leasing",y:2020,lat:40.6985,lng:-73.9956,c:[{ro:"Leasing",nm:"Two Trees Leasing",ph:"718-522-3600",em:"quay@twotreesny.com"}],ho:"Mon–Sun 10am–6pm",nt:"Ultra-luxury Brooklyn Bridge Park waterfront."},
+  {id:32,n:"Avalon Fort Greene",a:"343 Gold St",op:"AvalonBay",h:"Fort Greene",r:"Brooklyn",u:438,rn:"$2,900–$6,800",s:"Leasing",y:2011,lat:40.6920,lng:-73.9793,c:[{ro:"Leasing",nm:"AvalonBay Leasing",ph:"718-643-4567",em:"avalonfg@avalonbay.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"438-unit Downtown Brooklyn."},
+  {id:33,n:"250 North 10th (Williamsburg)",a:"250 N 10th St",op:"TF Cornerstone",h:"Williamsburg",r:"Brooklyn",u:234,rn:"$2,900–$6,000",s:"Leasing",y:2012,lat:40.7175,lng:-73.9565,c:[{ro:"Leasing",nm:"TFC Leasing",ph:"718-388-2500",em:"250n10@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"234-unit TFC Williamsburg."},
+  {id:34,n:"Union Channel (Gowanus Wharf)",a:"240 Third Ave",op:"Charney Companies",h:"Gowanus",r:"Brooklyn",u:224,rn:"$2,700–$5,500",s:"Leasing",y:2024,lat:40.6779,lng:-73.9908,c:[{ro:"Leasing",nm:"Charney Leasing",ph:"718-399-3300",em:"union@charneycompanies.com"}],ho:"Mon–Sun 10am–6pm",nt:"224-unit Gowanus Wharf campus. New 2024."},
+
+  // ══ QUEENS / LIC ══
+  {id:35,n:"4540 Center Blvd (TFC LIC)",a:"4540 Center Blvd",op:"TF Cornerstone",h:"Long Island City",r:"Queens",u:700,rn:"$3,200–$8,600",s:"Leasing",y:2015,lat:40.7468,lng:-73.9572,c:[{ro:"Residential",nm:"Jared Brown",ph:"718-606-9440",em:"jared.brown@tfc.com"},{ro:"Retail",nm:"Steve Gonzalez",ph:"212-984-1768",em:"steve.gonzalez@tfc.com"}],ho:"Mon–Sun 10am–6pm",nt:"TFC LIC waterfront flagship. Part of 2,700+ unit LIC campus."},
+  {id:36,n:"Linc LIC",a:"43-10 Crescent St",op:"RockRose",h:"Long Island City",r:"Queens",u:709,rn:"$2,800–$6,500",s:"Leasing",y:2014,lat:40.7499,lng:-73.9407,c:[{ro:"Leasing",nm:"RockRose Leasing",ph:"718-392-6020",em:"linc@rockrose.com"}],ho:"Mon–Sun 10am–6pm",nt:"709-unit RockRose LIC anchor."},
+  {id:37,n:"The Lion",a:"62-01 Queens Blvd",op:"RockRose",h:"Long Island City",r:"Queens",u:505,rn:"$2,700–$5,800",s:"Leasing",y:2017,lat:40.7441,lng:-73.9291,c:[{ro:"Leasing",nm:"RockRose Leasing",ph:"718-426-5700",em:"thelion@rockrose.com"}],ho:"Mon–Sun 10am–6pm",nt:"505-unit Queens Blvd corridor."},
+  {id:38,n:"The Italic (LIC)",a:"29-22 Northern Blvd",op:"Bozzuto",h:"Long Island City",r:"Queens",u:363,rn:"$2,900–$6,200",s:"Leasing",y:2024,lat:40.7517,lng:-73.9345,c:[{ro:"Leasing",nm:"Bozzuto Leasing",ph:"718-937-4500",em:"italic@bozzuto.com"}],ho:"Mon–Sun 10am–6pm",nt:"50-story. New 2024. Active lease-up."},
+  {id:39,n:"Lumen LIC",a:"29-17 40th Ave",op:"Bozzuto",h:"Long Island City",r:"Queens",u:300,rn:"$2,800–$5,900",s:"Lease-Up",y:2025,lat:40.7512,lng:-73.9378,c:[{ro:"Leasing",nm:"Bozzuto Leasing",ph:"718-786-2900",em:"lumen@bozzuto.com"}],ho:"Mon–Sun 10am–6pm",nt:"Spring 2025 delivery. Active lease-up."},
+  {id:40,n:"Jasper LIC",a:"5th St btw 50–49th Ave",op:"HAP Investments",h:"Long Island City",r:"Queens",u:499,rn:"$2,900–$6,500",s:"Lease-Up",y:2024,lat:40.7433,lng:-73.9406,c:[{ro:"Leasing",nm:"HAP Leasing",ph:"718-433-3300",em:"jasper@hapinvestments.com"}],ho:"Mon–Sun 10am–6pm",nt:"499 units + 40K sf retail. Full block LIC."},
+  {id:41,n:"Aura LIC",a:"29-37 Queens Plaza N",op:"Simon Baron Dev",h:"Long Island City",r:"Queens",u:400,rn:"$3,000–$6,800",s:"Lease-Up",y:2024,lat:40.7524,lng:-73.9397,c:[{ro:"Leasing",nm:"Aura Leasing",ph:"718-752-0200",em:"leasing@auralic.com"}],ho:"Mon–Sun 10am–6pm",nt:"37-story. 15K sf amenities."},
+  {id:42,n:"Hearthstone Astoria",a:"34-35 44th St",op:"Silverstein / Greystar",h:"Astoria",r:"Queens",u:354,rn:"$3,000–$6,500",s:"Leasing",y:2024,lat:40.7637,lng:-73.9154,c:[{ro:"Leasing",nm:"M.N.S. Real Estate",ph:"718-545-0202",em:"hearthstone@mns.com"}],ho:"Mon–Sun 10am–6pm",nt:"354-unit luxury. Silverstein Properties. Leasing launched Oct 2024."},
+  {id:43,n:"Astoria West",a:"30-77 Vernon Blvd",op:"Cape Advisors",h:"Astoria",r:"Queens",u:534,rn:"$2,800–$5,500",s:"Leasing",y:2022,lat:40.7583,lng:-73.9341,c:[{ro:"Leasing",nm:"Astoria West Leasing",ph:"718-706-7900",em:"leasing@astoriawest.com"}],ho:"Mon–Sun 10am–6pm",nt:"534 units across 3 buildings. 2.5-acre Vernon Blvd waterfront."},
+  {id:44,n:"Halletts Point Ph 1 (Durst)",a:"3-24 27th Ave",op:"Durst Organization",h:"Astoria",r:"Queens",u:405,rn:"$2,600–$5,000",s:"Leasing",y:2023,lat:40.7751,lng:-73.9325,c:[{ro:"Leasing",nm:"Durst Leasing",ph:"718-777-8000",em:"hallettspoint@durst.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"Phase 1 of 2,400-unit Durst East River megaproject."},
+  {id:45,n:"LeFrak City",a:"96-02 57th Ave, Corona",op:"LeFrak Organization",h:"Corona / Elmhurst",r:"Queens",u:4605,rn:"$1,450–$2,700",s:"Leasing",y:1962,lat:40.7365,lng:-73.8672,c:[{ro:"Leasing Director",nm:"Robert Madrid",ph:"718-592-5757",em:"leasing@lefrakcity.com"}],ho:"Mon–Fri 9–5, Sat 10–4",nt:"4,605-unit mega-complex. 20 towers, 40 acres. NYC's 2nd largest rental community."},
+  {id:46,n:"71 Prince Street (Flushing)",a:"71 Prince St",op:"Maddd Equities",h:"Flushing",r:"Queens",u:465,rn:"$2,500–$4,800",s:"Lease-Up",y:2024,lat:40.7620,lng:-73.8330,c:[{ro:"Leasing",nm:"Maddd Leasing",ph:"718-358-9200",em:"princestreet@maddd.com"}],ho:"Mon–Sun 10am–6pm",nt:"465 units. Pickleball court, gym, sky lounges. New 2024."},
+  {id:47,n:"NuSun Tower (Flushing)",a:"133-45 41st Ave",op:"Xinyuan Real Estate",h:"Flushing",r:"Queens",u:213,rn:"$2,400–$4,500",s:"Leasing",y:2022,lat:40.7588,lng:-73.8298,c:[{ro:"Leasing",nm:"NuSun Leasing",ph:"718-539-5200",em:"nusun@xinyuan.com"}],ho:"Mon–Sun 10am–6pm",nt:"213-unit luxury. Heart of downtown Flushing. Smart home features."},
+  {id:48,n:"Trylon Tower",a:"65-15 Queens Blvd",op:"Trylon Management",h:"Rego Park / Forest Hills",r:"Queens",u:312,rn:"$2,800–$5,200",s:"Leasing",y:2022,lat:40.7325,lng:-73.8663,c:[{ro:"Leasing",nm:"Trylon Leasing",ph:"718-459-1900",em:"leasing@trylontower.com"}],ho:"Mon–Sun 10am–6pm",nt:"312-unit. Edge of Rego Park / Forest Hills. Honors 1939 World's Fair heritage."},
+  {id:49,n:"VYV Newport (JC Tower B)",a:"70 Greene St, JC",op:"Veris Residential",h:"Newport JC",r:"NJ",u:447,rn:"$2,600–$5,500",s:"Leasing",y:2021,lat:40.7188,lng:-74.0418,c:[{ro:"Leasing",nm:"VYV Leasing",ph:"201-222-9700",em:"vyv@verisresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"447-unit luxury twin towers. Newport JC waterfront. Bilt Rewards. "},
+  {id:50,n:"The Austin (Forest Hills)",a:"108-26 71st Ave",op:"Park Tower Group",h:"Forest Hills",r:"Queens",u:169,rn:"$2,600–$4,500",s:"Leasing",y:2020,lat:40.7196,lng:-73.8452,c:[{ro:"Leasing",nm:"Austin Leasing",ph:"718-520-0020",em:"leasing@theaustinny.com"}],ho:"Mon–Sun 10am–6pm",nt:"169-unit Forest Hills Gardens area. Near E/F/M/R trains."},
+
+  // ══ BRONX ══
+  {id:51,n:"The Bankside",a:"2401 Third Ave",op:"Brookfield Properties",h:"Mott Haven",r:"Bronx",u:1352,rn:"$2,200–$5,500",s:"Leasing",y:2022,lat:40.8035,lng:-73.9277,c:[{ro:"Leasing",nm:"Brookfield Leasing",ph:"718-402-4100",em:"bankside@brookfieldproperties.com"}],ho:"Mon–Sun 10am–6pm",nt:"1,352-unit Brookfield Bronx waterfront. 5-building campus."},
+  {id:52,n:"Crossings at Bankside",a:"2500 Third Ave",op:"Brookfield Properties",h:"Mott Haven",r:"Bronx",u:848,rn:"$2,200–$5,000",s:"Lease-Up",y:2024,lat:40.8028,lng:-73.9270,c:[{ro:"Leasing",nm:"Brookfield Leasing",ph:"718-402-4200",em:"crossings@brookfieldproperties.com"}],ho:"Mon–Sun 10am–6pm",nt:"Phase 2 of Bankside. 848 units. 2024 delivery."},
+  {id:53,n:"The Estela",a:"101 Lincoln Ave",op:"The Collective",h:"Port Morris / Mott Haven",r:"Bronx",u:421,rn:"$2,400–$4,500",s:"Leasing",y:2023,lat:40.8088,lng:-73.9237,c:[{ro:"Leasing",nm:"The Collective Leasing",ph:"718-292-5500",em:"estela@thecollective.com"}],ho:"Mon–Sun 10am–6pm",nt:"421 units. Mott Haven arts district. Pool, rooftop, co-working."},
+  {id:54,n:"Parkchester",a:"1400 Metropolitan Ave",op:"Parkchester Preservation",h:"Parkchester",r:"Bronx",u:12271,rn:"$1,400–$2,600",s:"Leasing",y:1942,lat:40.8370,lng:-73.8589,c:[{ro:"Leasing",nm:"Parkchester Leasing",ph:"718-892-2000",em:"leasing@parkchesterbronx.com"}],ho:"Mon–Fri 9–5",nt:"12,271-unit Bronx mega-complex. Met Life built 1940–42. 171 acres. One of world's largest."},
+  {id:55,n:"Co-op City",a:"Co-op City Blvd, Bronx",op:"Riverbay Corporation",h:"Baychester",r:"Bronx",u:15372,rn:"$1,200–$2,400",s:"Leasing",y:1969,lat:40.8752,lng:-73.8305,c:[{ro:"Leasing",nm:"Riverbay Leasing",ph:"718-320-3300",em:"leasing@riverbay.com"}],ho:"Mon–Fri 9–5",nt:"15,372-unit — world's largest residential cooperative. 35 towers, 7 townhouse clusters."},
+
+  // ══ NJ — JERSEY CITY ══
+  {id:56,n:"Newport Campus (LeFrak)",a:"121 Town Square Pl, JC",op:"LeFrak Organization",h:"Newport JC",r:"NJ",u:6000,rn:"$2,460–$6,925",s:"Leasing",y:1987,lat:40.7195,lng:-74.0388,c:[{ro:"Leasing",nm:"Newport Rentals",ph:"201-626-9600",em:"leasing@newportrentals.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"6,000+ units across 12 buildings. LeFrak-developed Newport neighborhood. JC waterfront."},
+  {id:57,n:"Journal Square Urby",a:"25 Cottage St, JC",op:"Urby",h:"Journal Square JC",r:"NJ",u:317,rn:"$2,800–$5,175",s:"Leasing",y:2024,lat:40.7320,lng:-74.0638,c:[{ro:"Leasing",nm:"Urby Leasing",ph:"201-706-7900",em:"jssq@urby.com"}],ho:"Mon–Sun 10am–6pm",nt:"317-unit 25-story tower. Pantone mural. Across from PATH."},
+  {id:58,n:"The Greyson",a:"25 Cottage St, JC",op:"Nasser Freres",h:"Journal Square JC",r:"NJ",u:622,rn:"$2,600–$5,800",s:"Coming Soon",y:2026,lat:40.7324,lng:-74.0645,c:[{ro:"Leasing",nm:"The Marketing Directors",ph:"201-500-1000",em:"greyson@marketingdirectors.com"}],ho:"Leasing Feb 2026",nt:"622-unit 29-story. Handel Architects. Feb 2026 leasing launch."},
+  {id:59,n:"The Devan",a:"3 New York Ave, JC",op:"Fields Grade / Ursa",h:"JC / Hoboken border",r:"NJ",u:336,rn:"$2,615–$5,500",s:"Leasing",y:2024,lat:40.7389,lng:-74.0521,c:[{ro:"Leasing",nm:"The Devan Leasing",ph:"201-332-0300",em:"thedevan@fieldsgrade.com"}],ho:"Mon–Sun 10am–6pm",nt:"336 units. JC/Hoboken border. Near Light Rail."},
+  {id:60,n:"Hudson House",a:"315 15th St, JC",op:"RXR / Manhattan Bldg Co",h:"SoHo West JC",r:"NJ",u:829,rn:"$2,900–$6,200",s:"Lease-Up",y:2024,lat:40.7252,lng:-74.0448,c:[{ro:"Leasing",nm:"RXR Leasing",ph:"201-400-7200",em:"hudsonhouse@rxr.com"}],ho:"Mon–Sun 10am–6pm",nt:"829-unit 3-phase development. Near Holland Tunnel."},
+  {id:61,n:"499 Summit Ave",a:"499 Summit Ave, JC",op:"Panepinto Properties",h:"Journal Square JC",r:"NJ",u:605,rn:"TBD",s:"Coming Soon",y:2026,lat:40.7305,lng:-74.0628,c:[{ro:"Dev Contact",nm:"Panepinto",ph:"201-434-4900",em:"499summit@panepinto.com"}],ho:"Leasing 2026",nt:"53-story, $338M development. Under construction."},
+  {id:62,n:"Journal Squared Tower 3",a:"Journal Square, JC",op:"KRE Group",h:"Journal Square JC",r:"NJ",u:574,rn:"$2,500–$5,000",s:"Lease-Up",y:2025,lat:40.7317,lng:-74.0621,c:[{ro:"Leasing",nm:"KRE Leasing",ph:"201-451-0900",em:"jrnlsq@kregroup.com"}],ho:"Mon–Sun 10am–6pm",nt:"Tower 3 of Journal Squared. 574 units. 2025."},
+  {id:63,n:"425 Summit Ave",a:"425 Summit Ave, JC",op:"Ironstate Dev",h:"Journal Square JC",r:"NJ",u:390,rn:"$2,600–$4,800",s:"Leasing",y:2024,lat:40.7312,lng:-74.0635,c:[{ro:"Leasing",nm:"Ironstate Leasing",ph:"201-451-7700",em:"425summit@ironstate.com"}],ho:"Mon–Sun 10am–6pm",nt:"390-unit 27-story. New 2024."},
+  {id:64,n:"Jersey City Urby",a:"90 Columbus Dr, JC",op:"Urby",h:"Waterfront JC",r:"NJ",u:750,rn:"$2,700–$6,000",s:"Leasing",y:2017,lat:40.7172,lng:-74.0484,c:[{ro:"Leasing",nm:"Urby Leasing",ph:"201-706-7800",em:"jc@urby.com"}],ho:"Mon–Sun 10am–6pm",nt:"750-unit 57-story Urby flagship. JC waterfront."},
+  {id:65,n:"URL Harborside",a:"URL Harborside, JC",op:"Veris Residential",h:"Exchange Place JC",r:"NJ",u:760,rn:"$2,800–$6,500",s:"Leasing",y:2020,lat:40.7172,lng:-74.0347,c:[{ro:"Leasing",nm:"Veris Leasing",ph:"201-499-7000",em:"urlharborside@verisresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"760-unit luxury JC waterfront. Exchange Place PATH."},
+  {id:66,n:"The Hendrix",a:"180 Morgan St, JC",op:"Albanese Org",h:"Powerhouse Arts JC",r:"NJ",u:482,rn:"$2,800–$6,500",s:"Leasing",y:2022,lat:40.7215,lng:-74.0510,c:[{ro:"Leasing",nm:"Albanese Leasing",ph:"201-946-0100",em:"hendrix@albanese.com"}],ho:"Mon–Sun 10am–6pm",nt:"46-story. LEED Gold/Platinum certified. First in nation."},
+  {id:67,n:"400 Claremont Ave",a:"400 Claremont Ave, JC",op:"Hartz Mountain",h:"Bergen-Lafayette JC",r:"NJ",u:629,rn:"$2,200–$4,200",s:"Leasing",y:2021,lat:40.7002,lng:-74.0625,c:[{ro:"Leasing",nm:"Hartz Mountain",ph:"201-348-9100",em:"claremont@hartz.com"}],ho:"Mon–Sun 10am–6pm",nt:"629-unit. Near Liberty State Park."},
+  {id:68,n:"290 Coles St",a:"290 Coles St, JC",op:"Albanese / BXP / CrossHarbor",h:"SoHo West JC",r:"NJ",u:670,rn:"TBD",s:"Coming Soon",y:2028,lat:40.7258,lng:-74.0443,c:[{ro:"Dev Contact",nm:"Albanese Organization",ph:"201-946-0100",em:"info@albanese.com"}],ho:"Under construction — 2028",nt:"$400M, 670-unit two-tower. 14 + 21 stories."},
+
+  // ══ NJ — HOBOKEN ══
+  {id:69,n:"1000 Maxwell Lane (Hoboken)",a:"1000 Maxwell Ln, Hoboken",op:"Equity Residential",h:"Hoboken Waterfront",r:"NJ",u:347,rn:"$3,400–$7,000",s:"Leasing",y:2019,lat:40.7450,lng:-74.0280,c:[{ro:"Leasing",nm:"EQR Hoboken",ph:"201-217-0200",em:"maxwell@equityresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"Luxury Hoboken waterfront. Hudson River views."},
+  {id:70,n:"Hoboken Urby",a:"265 Observer Hwy, Hoboken",op:"Urby",h:"Hoboken",r:"NJ",u:345,rn:"$2,900–$5,500",s:"Coming Soon",y:2027,lat:40.7369,lng:-74.0302,c:[{ro:"Dev Contact",nm:"Urby",ph:"201-706-7900",em:"hoboken@urby.com"}],ho:"Breaking ground 2025 — opens 2027",nt:"345 units near Hoboken Terminal. Former DPW site."},
+  {id:71,n:"Maxwell Place on Hudson",a:"1100 Maxwell Ln, Hoboken",op:"Toll Brothers / AvalonBay",h:"Hoboken Waterfront",r:"NJ",u:225,rn:"$3,200–$7,000",s:"Leasing",y:2016,lat:40.7445,lng:-74.0272,c:[{ro:"Leasing",nm:"Maxwell Place Leasing",ph:"201-217-9200",em:"maxwellplace@avalonbay.com"}],ho:"Mon–Sun 10am–6pm",nt:"225-unit luxury Hoboken waterfront. Ferry access to Manhattan."},
+
+  // ══ NJ — EDGEWATER / FORT LEE ══
+  {id:72,n:"The Modera Lofts (Edgewater)",a:"12 The Promenade, Edgewater",op:"Mill Creek Residential",h:"Edgewater",r:"NJ",u:266,rn:"$2,800–$5,000",s:"Leasing",y:2017,lat:40.8224,lng:-73.9778,c:[{ro:"Leasing",nm:"Modera Leasing",ph:"201-943-6600",em:"moderaedgewater@millcreek.com"}],ho:"Mon–Sun 10am–6pm",nt:"266-unit luxury. Hudson River views. NJ Transit bus to midtown."},
+  {id:73,n:"77 Park (Fort Lee)",a:"77 Park Ave, Fort Lee",op:"Ironstate / Mack-Cali",h:"Fort Lee",r:"NJ",u:421,rn:"$2,700–$5,500",s:"Leasing",y:2018,lat:40.8510,lng:-73.9750,c:[{ro:"Leasing",nm:"77 Park Leasing",ph:"201-944-7700",em:"77park@ironstate.com"}],ho:"Mon–Sun 10am–6pm",nt:"421-unit Fort Lee. Views of George Washington Bridge."},
+
+  // ══ NJ — WEEHAWKEN / UNION CITY ══
+  {id:74,n:"Port Imperial (Weehawken)",a:"1200 Harbor Blvd, Weehawken",op:"Roseland Residential / Veris",h:"Port Imperial",r:"NJ",u:1800,rn:"$2,900–$8,000",s:"Leasing",y:2005,lat:40.7722,lng:-74.0178,c:[{ro:"Leasing",nm:"Veris Leasing",ph:"201-867-2700",em:"portimperial@verisresidential.com"}],ho:"Mon–Sun 10am–6pm",nt:"1,800+ units across multiple towers. Port Imperial ferry to midtown in 10 min."},
+
+  // ══ NJ — NEWARK ══
+  {id:75,n:"Urby Newark",a:"200 Mulberry St, Newark",op:"Urby",h:"Downtown Newark",r:"NJ",u:360,rn:"$1,900–$3,800",s:"Leasing",y:2020,lat:40.7392,lng:-74.1722,c:[{ro:"Leasing",nm:"Urby Leasing",ph:"973-733-4700",em:"newark@urby.com"}],ho:"Mon–Sun 10am–6pm",nt:"360-unit Urby. PATH to WTC in 20 min. Most affordable in portfolio."},
+
+  // ══ WESTCHESTER ══
+  {id:76,n:"Alexander Crossing (Yonkers)",a:"1 Grassy Sprain Rd, Yonkers",op:"Rose Associates",h:"Yonkers",r:"Westchester",u:440,rn:"$2,400–$4,800",s:"Leasing",y:2024,lat:40.9548,lng:-73.8867,c:[{ro:"Leasing",nm:"Rose Associates",ph:"914-377-0200",em:"alexander@rosenyc.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"440 units. New construction. $112.7M refinanced."},
+  {id:77,n:"One Clinton (Yonkers)",a:"1 Clinton St, Yonkers",op:"RXR Realty",h:"Downtown Yonkers",r:"Westchester",u:410,rn:"$2,300–$4,500",s:"Leasing",y:2022,lat:40.9310,lng:-73.8988,c:[{ro:"Leasing",nm:"RXR Leasing",ph:"914-376-7100",em:"oneclinton@rxr.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"410-unit. Yonkers waterfront. Metro-North access."},
+  {id:78,n:"The Ridgeway (White Plains)",a:"501 Ridgeway Ave, White Plains",op:"AvalonBay",h:"White Plains",r:"Westchester",u:300,rn:"$2,600–$4,800",s:"Leasing",y:2023,lat:41.0340,lng:-73.7629,c:[{ro:"Leasing",nm:"AvalonBay Leasing",ph:"914-686-7300",em:"ridgeway@avalonbay.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"300-unit luxury. White Plains transit hub. Metro-North."},
+  {id:79,n:"525 White Plains Rd (Tarrytown)",a:"525 White Plains Rd, Tarrytown",op:"AvalonBay",h:"Tarrytown",r:"Westchester",u:244,rn:"$2,400–$4,200",s:"Leasing",y:2019,lat:41.0643,lng:-73.8619,c:[{ro:"Leasing",nm:"AvalonBay Leasing",ph:"914-631-4200",em:"tarrytown@avalonbay.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"244 units. Metro-North Hudson Line access."},
+  {id:80,n:"Avalon Rockville Centre",a:"97 N Village Ave, Rockville Centre",op:"AvalonBay",h:"Rockville Centre",r:"Westchester",u:176,rn:"$2,300–$4,000",s:"Leasing",y:2016,lat:40.6567,lng:-73.6415,c:[{ro:"Leasing",nm:"AvalonBay Leasing",ph:"516-678-3700",em:"rockvillecentre@avalonbay.com"}],ho:"Mon–Fri 9–6, Sat–Sun 10–5",nt:"176-unit. LIRR Babylon Branch. Nassau County."},
+];
+
+let map, markers=[], flt={region:"all",status:"all"}, aid=null;
+
+function fmtN(n){return n>=10000?Math.round(n/1000)+"K+":n>=1000?(n/1000).toFixed(0)+"K+":n.toString();}
+function totalU(ps){return ps.reduce((s,p)=>s+(isNaN(p.u)?0:p.u),0);}
+function uniq(ps,k){return new Set(ps.map(p=>p[k])).size;}
+
+function initMap(){
+  map=L.map('map',{center:[40.74,-73.97],zoom:11});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',maxZoom:19}).addTo(map);
+  P.forEach(p=>{
+    const col=RC[p.r]||'#888', isNew=p.y>=2022, isMega=p.u>=3000;
+    const sz=isMega?20:isNew?16:13;
+    const ico=L.divIcon({className:'',
+      html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};border:${isMega?'3px':'2px'} solid ${isMega?'#ffe066':'rgba(255,255,255,0.6)'};box-shadow:0 0 ${isMega?12:isNew?7:4}px ${col}99;"></div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    });
+    const ct=p.c.map(c=>`<div class="pr"><strong style="color:#3dd68c">${c.ro}:</strong> ${c.nm}<br>📞 <a href="tel:${c.ph}" style="color:#88ccff">${c.ph}</a> · ✉️ <a href="mailto:${c.em}" style="color:#88ccff">${c.em}</a></div>`).join('');
+    const pop=`<div style="min-width:240px">
+      <div class="pt">${SI[p.s]||''} ${p.n}</div>
+      <div class="pm">${p.op} · ${p.h} · ${p.r}</div>
+      <div class="pr">🏢 ${p.u.toLocaleString()} units · ${p.y}</div>
+      <div class="pr">💰 ${p.rn}/mo · ${p.s}</div>
+      <div class="pr">🕐 ${p.ho}</div>
+      <div class="pc2">${ct}</div>
+      <div class="pr" style="margin-top:4px;color:#4a6a80;font-style:italic;font-size:9px">${p.nt}</div>
+    </div>`;
+    const mk=L.marker([p.lat,p.lng],{icon:ico}).addTo(map).bindPopup(pop,{maxWidth:320});
+    mk.on('click',()=>{setA(p.id);scrollC(p.id);});
+    markers.push({id:p.id,marker:mk,prop:p});
+  });
+  updateStats(P); renderList(P);
+}
+
+function renderList(ps){
+  const list=document.getElementById('list');
+  list.innerHTML='';
+  document.getElementById('vc').textContent=`${ps.length} properties`;
+  updateStats(ps);
+  ps.forEach(p=>{
+    const col=RC[p.r]||'#888', isNew=p.y>=2022, isMega=p.u>=3000;
+    const ct=p.c.map(c=>`<div class="ci"><span class="clbl">${c.ro}:</span> ${c.nm} · <a href="tel:${c.ph}">${c.ph}</a> · <a href="mailto:${c.em}">${c.em}</a></div>`).join('');
+    const d=document.createElement('div');
+    d.className=`pc${aid===p.id?' active':''}`;
+    d.id=`card-${p.id}`;
+    d.innerHTML=`
+      <div class="pn" style="color:${col}">${SI[p.s]||''} ${p.n}</div>
+      <div class="ps">${p.op} · ${p.h} · ${p.a}</div>
+      <div class="tr">
+        <span class="tg to">${p.r}</span>
+        <span class="tg tu">${p.u.toLocaleString()} units</span>
+        <span class="tg tr2">${p.rn}</span>
+        ${isNew?`<span class="tg tn">New ${p.y}</span>`:''}
+        ${isMega?`<span class="tg" style="background:#3a2a00;color:#ffe066">⭐ Mega</span>`:''}
+      </div>
+      <div>${ct}</div>
+      <div class="nt">${p.nt}</div>`;
+    d.onclick=()=>{setA(p.id);const m=markers.find(m=>m.id===p.id);if(m){map.setView([p.prop.lat,p.prop.lng],14);m.marker.openPopup();}};
+    list.appendChild(d);
+  });
+}
+
+function updateStats(ps){
+  document.getElementById('sp').textContent=ps.length;
+  document.getElementById('su').textContent=fmtN(totalU(ps));
+  document.getElementById('sr').textContent=uniq(ps,'r');
+  document.getElementById('so').textContent=uniq(ps,'op');
+}
+function setA(id){
+  aid=id;
+  document.querySelectorAll('.pc').forEach(c=>c.classList.remove('active'));
+  const c=document.getElementById(`card-${id}`);
+  if(c)c.classList.add('active');
+}
+function scrollC(id){const c=document.getElementById(`card-${id}`);if(c)c.scrollIntoView({behavior:'smooth',block:'nearest'});}
+
+function fAll(){
+  const q=document.getElementById('si').value.toLowerCase();
+  const res=P.filter(p=>{
+    const mr=flt.region==='all'||p.r===flt.region;
+    const ms=flt.status==='all'||p.s===flt.status;
+    const mq=!q||p.n.toLowerCase().includes(q)||p.op.toLowerCase().includes(q)||p.h.toLowerCase().includes(q)||p.r.toLowerCase().includes(q)||p.a.toLowerCase().includes(q)||p.nt.toLowerCase().includes(q);
+    return mr&&ms&&mq;
+  });
+  renderList(res);
+  markers.forEach(({id,marker})=>{
+    const vis=res.some(p=>p.id===id);
+    if(vis){if(!map.hasLayer(marker))marker.addTo(map);}
+    else{if(map.hasLayer(marker))map.removeLayer(marker);}
+  });
+}
+
+document.getElementById('rf').addEventListener('click',e=>{
+  if(!e.target.matches('.fb'))return;
+  document.querySelectorAll('#rf .fb').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  flt.region=e.target.dataset.v;
+  fAll();
+});
+document.getElementById('sf').addEventListener('click',e=>{
+  if(!e.target.matches('.fb'))return;
+  document.querySelectorAll('#sf .fb').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+  flt.status=e.target.dataset.v;
+  fAll();
+});
+
+initMap();
+</script>
+</body>
+</html>
