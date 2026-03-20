@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grotto AI — NYC Luxury Multifamily Operator Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { display: flex; height: 100vh; overflow: hidden; background: #f5f5f5; }
+  #sidebar {
+    width: 340px; min-width: 340px; background: #0f1b2e; color: #fff;
+    display: flex; flex-direction: column; overflow: hidden; z-index: 1000;
+  }
+  #sidebar-header {
+    padding: 16px 18px 12px;
+    background: #0a1220;
+    border-bottom: 2px solid #1e7c5a;
+  }
+  #sidebar-header h1 { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
+  #sidebar-header p { font-size: 11px; color: #88aacc; margin-top: 4px; }
+  #controls { padding: 12px 16px; background: #0e1828; border-bottom: 1px solid #1a2f4a; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .filter-btn {
+    padding: 4px 10px; font-size: 11px; border-radius: 12px; border: none;
+    cursor: pointer; font-weight: 600; transition: all 0.15s;
+    background: #1a2f4a; color: #88aacc;
+  }
+  .filter-btn.active { background: #1e7c5a; color: #fff; }
+  #search-input {
+    width: 100%; padding: 7px 10px; border-radius: 6px; border: 1px solid #1a3a5c;
+    background: #0a1220; color: #fff; font-size: 12px; outline: none;
+  }
+  #search-input::placeholder { color: #446688; }
+  #stats { padding: 10px 16px; background: #0b1525; border-bottom: 1px solid #1a2f4a; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .stat-box { background: #0e1828; border-radius: 6px; padding: 7px 8px; text-align: center; }
+  .stat-val { font-size: 14px; font-weight: 700; color: #3dd68c; }
+  .stat-lbl { font-size: 9px; color: #556a88; margin-top: 1px; }
+  .total-count { font-size: 11px; color: #88aacc; }
+  #list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  #list::-webkit-scrollbar { width: 4px; }
+  #list::-webkit-scrollbar-track { background: #0a1220; }
+  #list::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 2px; }
+  .prop-card {
+    padding: 10px 16px; border-bottom: 1px solid #1a2f4a; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .prop-card:hover { background: #0e1c30; }
+  .prop-card.active { background: #0d2a1a; border-left: 3px solid #1e7c5a; }
+  .prop-name { font-size: 12px; font-weight: 700; color: #e0eaff; margin-bottom: 2px; }
+  .prop-meta { font-size: 10px; color: #557799; margin-bottom: 4px; }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+  .tag {
+    font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 8px;
+  }
+  .tag-mgt { background: #1a3a5c; color: #88ccff; }
+  .tag-size { background: #1a2f1a; color: #3dd68c; }
+  .tag-rent { background: #2a1f0a; color: #f0a030; }
+  .contact-section { margin-top: 4px; }
+  .contact-item { font-size: 10px; color: #88aacc; line-height: 1.6; }
+  .contact-item a { color: #3dd68c; text-decoration: none; }
+  .contact-label { color: #3dd68c; font-weight: 700; font-size: 9px; }
+  #map { flex: 1; z-index: 1; }
+  .leaflet-popup-content-wrapper { background: #0f1b2e; border: 1px solid #1e7c5a; border-radius: 8px; color: #fff; }
+  .leaflet-popup-tip { background: #0f1b2e; }
+  .popup-title { font-size: 13px; font-weight: 700; color: #3dd68c; margin-bottom: 4px; }
+  .popup-mgr { font-size: 11px; color: #88aacc; margin-bottom: 6px; }
+  .popup-row { font-size: 10px; color: #ccdde6; margin: 2px 0; }
+  .popup-contact { margin-top: 6px; font-size: 10px; line-height: 1.7; }
+  .popup-contact strong { color: #3dd68c; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>Grotto AI — NYC Luxury Multifamily</h1>
+    <p>Large-Scale Operators &amp; Leasing Contacts</p>
+  </div>
+  <div id="controls">
+    <div class="filter-row" id="type-filters">
+      <button class="filter-btn active" data-type="all">All Operators</button>
+      <button class="filter-btn" data-type="TF Cornerstone">TF Cornerstone</button>
+      <button class="filter-btn" data-type="Related">Related</button>
+      <button class="filter-btn" data-type="Brookfield">Brookfield</button>
+      <button class="filter-btn" data-type="Other">Other</button>
+    </div>
+    <div class="filter-row" id="region-filters">
+      <button class="filter-btn active" data-region="all">All Boroughs</button>
+      <button class="filter-btn" data-region="Manhattan">Manhattan</button>
+      <button class="filter-btn" data-region="Queens">Queens/LIC</button>
+      <button class="filter-btn" data-region="Brooklyn">Brooklyn</button>
+    </div>
+    <input type="text" id="search-input" placeholder="Search building, operator, neighborhood..." oninput="filterAll()"/>
+  </div>
+  <div id="stats">
+    <div class="total-count" id="visible-count">25 properties displayed</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-val" id="stat-units">18,400+</div><div class="stat-lbl">Total Units</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-ops">8</div><div class="stat-lbl">Operators</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-avg">$4,200</div><div class="stat-lbl">Avg Rent</div></div>
+    </div>
+  </div>
+  <div id="list"></div>
+</div>
+<div id="map"></div>
+
+<script>
+const PROPERTIES = [
+  // TF CORNERSTONE
+  {
+    id:1, name:"4540 Center Blvd", operator:"TF Cornerstone", neighborhood:"Long Island City", borough:"Queens",
+    units:700, rents:"$3,200–$8,600", type:"Luxury High-Rise", lat:40.7468, lng:-73.9572,
+    leasing:[
+      {role:"Residential Leasing", name:"Jared Brown", phone:"718-606-9440", email:"jared.brown@tfc.com"},
+      {role:"Retail Leasing", name:"Steve Gonzalez", phone:"212-984-1768", email:"steve.gonzalez@tfc.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"Waterfront LIC tower. Part of TFC's 2,700+ unit LIC portfolio."
+  },
+  {
+    id:2, name:"The Max (606 W 57th St)", operator:"TF Cornerstone", neighborhood:"Hell's Kitchen", borough:"Manhattan",
+    units:1028, rents:"$3,800–$9,500", type:"Luxury High-Rise", lat:40.7698, lng:-73.9918,
+    leasing:[
+      {role:"Leasing Office", name:"Leasing Team", phone:"212-757-8900", email:"themax@tfc.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"1,028-unit tower. One of TFC's largest single buildings."
+  },
+  {
+    id:3, name:"505 West 37th Street", operator:"TF Cornerstone", neighborhood:"Hudson Yards", borough:"Manhattan",
+    units:835, rents:"$3,600–$8,200", type:"Luxury High-Rise", lat:40.7560, lng:-74.0005,
+    leasing:[
+      {role:"Leasing Office", name:"Leasing Team", phone:"212-290-7805", email:"505w37@tfc.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"835 units near Hudson Yards. High conversion environment."
+  },
+  {
+    id:4, name:"2 Gold Street", operator:"TF Cornerstone", neighborhood:"Financial District", borough:"Manhattan",
+    units:650, rents:"$3,200–$7,800", type:"Luxury High-Rise", lat:40.7062, lng:-74.0085,
+    leasing:[
+      {role:"Leasing Office", name:"Leasing Team", phone:"212-514-9200", email:"2gold@tfc.com"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat–Sun 10am–5pm", notes:"650-unit FiDi tower. Pool, gym, children's playroom."
+  },
+  {
+    id:5, name:"455 West 37th Street", operator:"TF Cornerstone", neighborhood:"Hudson Yards", borough:"Manhattan",
+    units:394, rents:"$3,500–$7,500", type:"Luxury High-Rise", lat:40.7558, lng:-74.0015,
+    leasing:[
+      {role:"Leasing Office", name:"Leasing Team", phone:"212-290-7810", email:"455w37@tfc.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"394 units. Hudson Yards corridor."
+  },
+  {
+    id:6, name:"45 Wall Street", operator:"TF Cornerstone", neighborhood:"Financial District", borough:"Manhattan",
+    units:435, rents:"$3,100–$7,200", type:"Luxury High-Rise", lat:40.7074, lng:-74.0114,
+    leasing:[
+      {role:"Leasing Office", name:"Leasing Team", phone:"212-968-1520", email:"45wall@tfc.com"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat–Sun 10am–5pm", notes:"435 units on Wall Street. Historic conversion."
+  },
+
+  // RELATED COMPANIES
+  {
+    id:7, name:"The Easton (205 E 92nd St)", operator:"Related", neighborhood:"Upper East Side", borough:"Manhattan",
+    units:323, rents:"$4,500–$15,000", type:"Luxury High-Rise", lat:40.7822, lng:-73.9516,
+    leasing:[
+      {role:"Leasing Director", name:"Related Leasing", phone:"212-249-9700", email:"easton@related.com"}
+    ],
+    hours:"Mon–Sat 10am–6pm, Sun 11am–5pm", notes:"Full-service luxury. Related residential flagship."
+  },
+  {
+    id:8, name:"One Hudson Yards (500 W 30th)", operator:"Related", neighborhood:"Hudson Yards", borough:"Manhattan",
+    units:285, rents:"$5,500–$20,000+", type:"Ultra-Luxury", lat:40.7536, lng:-74.0010,
+    leasing:[
+      {role:"Leasing Office", name:"Related Leasing", phone:"212-760-6767", email:"hudsonspire@related.com"}
+    ],
+    hours:"By appointment preferred", notes:"Ultra-luxury Related residential at Hudson Yards."
+  },
+  {
+    id:9, name:"Abington House (500 W 30th)", operator:"Related", neighborhood:"Hudson Yards", borough:"Manhattan",
+    units:366, rents:"$4,200–$12,000", type:"Luxury High-Rise", lat:40.7542, lng:-74.0005,
+    leasing:[
+      {role:"Leasing Office", name:"Related Residential", phone:"212-268-5900", email:"abington@related.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"366 units. Related's Hudson Yards residential portfolio."
+  },
+
+  // BROOKFIELD PROPERTIES
+  {
+    id:10, name:"Manhattan West — Rental Tower", operator:"Brookfield", neighborhood:"Hudson Yards/Chelsea", borough:"Manhattan",
+    units:844, rents:"$4,000–$14,000", type:"Luxury Mixed-Use", lat:40.7540, lng:-73.9998,
+    leasing:[
+      {role:"Residential Leasing", name:"Brookfield Residential", phone:"212-417-7000", email:"mwest@brookfieldproperties.com"}
+    ],
+    hours:"Mon–Fri 9am–6pm", notes:"844-unit luxury tower at Manhattan West development."
+  },
+  {
+    id:11, name:"One Blue Slip (58 Beard St)", operator:"Brookfield", neighborhood:"Red Hook/DUMBO", borough:"Brooklyn",
+    units:450, rents:"$3,200–$8,500", type:"Luxury Waterfront", lat:40.6785, lng:-74.0084,
+    leasing:[
+      {role:"Leasing Office", name:"Brookfield Leasing", phone:"718-210-9200", email:"oneblueslip@brookfieldproperties.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"Waterfront luxury in Red Hook/Industry City corridor."
+  },
+
+  // EQUITY RESIDENTIAL
+  {
+    id:12, name:"The Harrison (205 W 76th St)", operator:"Equity Residential", neighborhood:"Upper West Side", borough:"Manhattan",
+    units:219, rents:"$4,200–$11,000", type:"Luxury High-Rise", lat:40.7803, lng:-73.9812,
+    leasing:[
+      {role:"Leasing Office", name:"EQR Leasing", phone:"212-799-1000", email:"harrison@equityresidential.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"Equity Residential flagship UWS. National operator, 300K+ units."
+  },
+  {
+    id:13, name:"The Lyric (255 W 94th St)", operator:"Equity Residential", neighborhood:"Upper West Side", borough:"Manhattan",
+    units:286, rents:"$3,800–$10,500", type:"Luxury High-Rise", lat:40.7942, lng:-73.9726,
+    leasing:[
+      {role:"Leasing Office", name:"EQR Leasing", phone:"212-666-9800", email:"lyric@equityresidential.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"286 units. Strong UWS leasing environment."
+  },
+
+  // AVALON BAY COMMUNITIES
+  {
+    id:14, name:"Avalon Midtown West (310 W 52nd)", operator:"AvalonBay", neighborhood:"Midtown West", borough:"Manhattan",
+    units:323, rents:"$3,800–$9,200", type:"Luxury High-Rise", lat:40.7626, lng:-73.9863,
+    leasing:[
+      {role:"Leasing Office", name:"AvalonBay Leasing", phone:"212-245-3200", email:"avalonmidtown@avalonbay.com"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat–Sun 10am–5pm", notes:"AvalonBay Communities — NYSE: AVB. 90,000+ units nationally."
+  },
+  {
+    id:15, name:"Avalon Fort Greene (343 Gold St)", operator:"AvalonBay", neighborhood:"Fort Greene", borough:"Brooklyn",
+    units:438, rents:"$2,900–$6,800", type:"Luxury High-Rise", lat:40.6920, lng:-73.9793,
+    leasing:[
+      {role:"Leasing Office", name:"AvalonBay Leasing", phone:"718-643-4567", email:"avalonfg@avalonbay.com"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat–Sun 10am–5pm", notes:"438-unit Downtown Brooklyn luxury tower."
+  },
+
+  // GLENWOOD MANAGEMENT
+  {
+    id:16, name:"The Ventura (130 E 40th St)", operator:"Glenwood", neighborhood:"Murray Hill", borough:"Manhattan",
+    units:502, rents:"$3,600–$9,000", type:"Luxury High-Rise", lat:40.7517, lng:-73.9791,
+    leasing:[
+      {role:"Leasing Office", name:"Glenwood Leasing", phone:"212-683-7474", email:"ventura@glenwood.nyc"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat 10am–5pm", notes:"Glenwood — NYC luxury specialist. 10,000+ units across Manhattan."
+  },
+  {
+    id:17, name:"The Milan (300 E 55th St)", operator:"Glenwood", neighborhood:"Midtown East", borough:"Manhattan",
+    units:516, rents:"$3,800–$10,000", type:"Luxury High-Rise", lat:40.7558, lng:-73.9664,
+    leasing:[
+      {role:"Leasing Office", name:"Glenwood Leasing", phone:"212-752-8600", email:"milan@glenwood.nyc"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat 10am–5pm", notes:"516 units. Midtown East prime leasing location."
+  },
+  {
+    id:18, name:"The Sheffield (322 W 57th St)", operator:"Glenwood", neighborhood:"Midtown West", borough:"Manhattan",
+    units:845, rents:"$3,900–$11,000", type:"Luxury High-Rise", lat:40.7670, lng:-73.9846,
+    leasing:[
+      {role:"Leasing Office", name:"Glenwood Leasing", phone:"212-247-3131", email:"sheffield@glenwood.nyc"}
+    ],
+    hours:"Mon–Fri 9am–6pm, Sat 10am–5pm", notes:"845 units. One of Glenwood's largest."
+  },
+
+  // TWO TREES MANAGEMENT
+  {
+    id:19, name:"One John Street", operator:"Two Trees", neighborhood:"DUMBO", borough:"Brooklyn",
+    units:323, rents:"$3,500–$9,000", type:"Luxury Waterfront", lat:40.7033, lng:-73.9892,
+    leasing:[
+      {role:"Leasing Office", name:"Two Trees Leasing", phone:"718-254-1400", email:"onejohn@twotreesny.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"Two Trees flagship DUMBO. Pioneer of Brooklyn luxury market."
+  },
+  {
+    id:20, name:"Quay Tower (50 Bridge Park Dr)", operator:"Two Trees", neighborhood:"Brooklyn Heights", borough:"Brooklyn",
+    units:126, rents:"$4,200–$14,000", type:"Ultra-Luxury Waterfront", lat:40.6985, lng:-73.9956,
+    leasing:[
+      {role:"Leasing Office", name:"Two Trees Leasing", phone:"718-522-3600", email:"quay@twotreesny.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"126-unit ultra-luxury. Brooklyn Bridge Park waterfront."
+  },
+
+  // ROCKROSE DEVELOPMENT
+  {
+    id:21, name:"Linc LIC (43-10 Crescent St)", operator:"RockRose", neighborhood:"Long Island City", borough:"Queens",
+    units:709, rents:"$2,800–$6,500", type:"Luxury High-Rise", lat:40.7499, lng:-73.9407,
+    leasing:[
+      {role:"Leasing Office", name:"RockRose Leasing", phone:"718-392-6020", email:"linc@rockrose.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"709 units. RockRose — 7,000+ units in NYC/DC."
+  },
+  {
+    id:22, name:"The Lion (62-01 Queens Blvd)", operator:"RockRose", neighborhood:"Long Island City", borough:"Queens",
+    units:505, rents:"$2,700–$5,800", type:"Luxury High-Rise", lat:40.7441, lng:-73.9291,
+    leasing:[
+      {role:"Leasing Office", name:"RockRose Leasing", phone:"718-426-5700", email:"thelion@rockrose.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"505 units. Queens Blvd LIC corridor."
+  },
+
+  // EXTELL DEVELOPMENT
+  {
+    id:23, name:"One Manhattan Square (252 South St)", operator:"Extell", neighborhood:"Lower East Side", borough:"Manhattan",
+    units:815, rents:"$3,800–$12,000", type:"Luxury High-Rise", lat:40.7108, lng:-73.9844,
+    leasing:[
+      {role:"Leasing Office", name:"Extell Leasing", phone:"212-945-5050", email:"onemanhattansq@extell.com"}
+    ],
+    hours:"Mon–Sun 10am–7pm", notes:"815 units. Extell's flagship rental. 100+ amenities."
+  },
+
+  // BOZZUTO GROUP
+  {
+    id:24, name:"The Italic (29-22 Northern Blvd)", operator:"Bozzuto", neighborhood:"Long Island City", borough:"Queens",
+    units:363, rents:"$2,900–$6,200", type:"Luxury High-Rise", lat:40.7517, lng:-73.9345,
+    leasing:[
+      {role:"Leasing Office", name:"Bozzuto Leasing", phone:"718-937-4500", email:"italic@bozzuto.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"363-unit 50-story tower. New 2024–25 delivery. Bozzuto national operator."
+  },
+  {
+    id:25, name:"Lumen LIC (29-17 40th Ave)", operator:"Bozzuto", neighborhood:"Long Island City", borough:"Queens",
+    units:300, rents:"$2,800–$5,900", type:"Luxury High-Rise", lat:40.7512, lng:-73.9378,
+    leasing:[
+      {role:"Leasing Office", name:"Bozzuto Leasing", phone:"718-786-2900", email:"lumen@bozzuto.com"}
+    ],
+    hours:"Mon–Sun 10am–6pm", notes:"300 units. Spring 2025 delivery. Active lease-up."
+  }
+];
+
+const OPERATOR_COLORS = {
+  "TF Cornerstone": "#3dd68c",
+  "Related": "#4a9eff",
+  "Brookfield": "#ff9f40",
+  "Equity Residential": "#c088ff",
+  "AvalonBay": "#ff6b6b",
+  "Glenwood": "#ffd700",
+  "Two Trees": "#00d4cc",
+  "RockRose": "#ff8c69",
+  "Extell": "#98fb98",
+  "Bozzuto": "#dda0dd"
+};
+
+let map, markers = [], activeFilters = { type: 'all', region: 'all' }, activeCardId = null;
+
+function initMap() {
+  map = L.map('map', { center: [40.74, -73.97], zoom: 12 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 19
+  }).addTo(map);
+
+  PROPERTIES.forEach(p => {
+    const color = OPERATOR_COLORS[p.operator] || '#888';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color}88;"></div>`,
+      iconSize: [14, 14], iconAnchor: [7, 7]
+    });
+
+    const contacts = p.leasing.map(c =>
+      `<div class="popup-row"><strong style="color:#3dd68c">${c.role}:</strong> ${c.name}<br>
+       📞 <a href="tel:${c.phone}" style="color:#88ccff">${c.phone}</a> |
+       ✉️ <a href="mailto:${c.email}" style="color:#88ccff">${c.email}</a></div>`
+    ).join('');
+
+    const popup = `
+      <div style="min-width:240px">
+        <div class="popup-title">${p.name}</div>
+        <div class="popup-mgr">${p.operator} · ${p.neighborhood}</div>
+        <div class="popup-row">🏢 ${p.units} units · ${p.type}</div>
+        <div class="popup-row">💰 ${p.rents}/mo</div>
+        <div class="popup-row">🕐 ${p.hours}</div>
+        <div class="popup-contact">${contacts}</div>
+        <div class="popup-row" style="margin-top:5px;color:#88aacc;font-style:italic">${p.notes}</div>
+      </div>`;
+
+    const marker = L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup, { maxWidth: 320 });
+    marker.on('click', () => { setActive(p.id); scrollToCard(p.id); });
+    markers.push({ id: p.id, marker, prop: p });
+  });
+
+  renderList(PROPERTIES);
+}
+
+function renderList(props) {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  document.getElementById('visible-count').textContent = `${props.length} properties displayed`;
+  props.forEach(p => {
+    const color = OPERATOR_COLORS[p.operator] || '#888';
+    const contacts = p.leasing.map(c =>
+      `<div class="contact-item"><span class="contact-label">${c.role}:</span> ${c.name} · <a href="tel:${c.phone}">${c.phone}</a> · <a href="mailto:${c.email}">${c.email}</a></div>`
+    ).join('');
+
+    const card = document.createElement('div');
+    card.className = `prop-card${activeCardId === p.id ? ' active' : ''}`;
+    card.id = `card-${p.id}`;
+    card.innerHTML = `
+      <div class="prop-name" style="color:${color}">${p.name}</div>
+      <div class="prop-meta">${p.operator} · ${p.neighborhood} · ${p.borough}</div>
+      <div class="tag-row">
+        <span class="tag tag-mgt">${p.operator}</span>
+        <span class="tag tag-size">${p.units} units</span>
+        <span class="tag tag-rent">${p.rents}</span>
+      </div>
+      <div class="contact-section">${contacts}</div>
+      <div class="contact-item" style="color:#556a88;margin-top:3px;font-style:italic">${p.notes}</div>`;
+    card.onclick = () => {
+      setActive(p.id);
+      const m = markers.find(m => m.id === p.id);
+      if (m) { map.setView([p.lat, p.lng], 14); m.marker.openPopup(); }
+    };
+    list.appendChild(card);
+  });
+}
+
+function setActive(id) {
+  activeCardId = id;
+  document.querySelectorAll('.prop-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.classList.add('active');
+}
+
+function scrollToCard(id) {
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function filterAll() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const filtered = PROPERTIES.filter(p => {
+    const matchType = activeFilters.type === 'all' || p.operator === activeFilters.type;
+    const matchRegion = activeFilters.region === 'all' ||
+      (activeFilters.region === 'Queens' && p.borough === 'Queens') ||
+      (activeFilters.region === 'Brooklyn' && p.borough === 'Brooklyn') ||
+      (activeFilters.region === 'Manhattan' && p.borough === 'Manhattan');
+    const matchSearch = !search || p.name.toLowerCase().includes(search) ||
+      p.operator.toLowerCase().includes(search) || p.neighborhood.toLowerCase().includes(search) ||
+      p.borough.toLowerCase().includes(search);
+    return matchType && matchRegion && matchSearch;
+  });
+  renderList(filtered);
+  markers.forEach(({ id, marker }) => {
+    const visible = filtered.some(p => p.id === id);
+    if (visible) { if (!map.hasLayer(marker)) marker.addTo(map); }
+    else { if (map.hasLayer(marker)) map.removeLayer(marker); }
+  });
+}
+
+document.getElementById('type-filters').addEventListener('click', e => {
+  if (!e.target.matches('.filter-btn')) return;
+  document.querySelectorAll('#type-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  activeFilters.type = e.target.dataset.type;
+  filterAll();
+});
+
+document.getElementById('region-filters').addEventListener('click', e => {
+  if (!e.target.matches('.filter-btn')) return;
+  document.querySelectorAll('#region-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  activeFilters.region = e.target.dataset.region;
+  filterAll();
+});
+
+initMap();
+</script>
+</body>
+</html>
